@@ -1,0 +1,149 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings FATAL => 'all';
+
+use IPC::Run qw(run);
+use Config::Tiny ();
+use Getopt::Long;
+#use Log::Dispatch::Config;
+#use Log::Dispatch::Configurator::Any;
+
+my $VERSION = '1.01';
+$VERSION = eval $VERSION; # numify for warning-free dev releases
+
+my $DEFAULT_CONFIG_FILE = '/etc/nfflowd.conf';
+my $config_file = $DEFAULT_CONFIG_FILE;
+my $help ='';
+
+my $result = GetOptions(
+    'h|help'     => \$help,
+    'c|config=s' => \$config_file,
+);
+$help and &quit_with_help;
+
+# bootstrap configuration:
+# try requested, then default loc, then built-ins
+my $config = Config::Tiny->read($config_file);
+if (!defined $config and $config_file ne $DEFAULT_CONFIG_FILE) {
+    die "Failed to load requested config: $Config::Tiny::errstr\n"
+}
+
+# mix in the built-ins
+$config = &merge_hashes({
+    conntrack => {
+        progname  => 'conntrack',
+        init_args => [qw(-L >/dev/null 2>&1)], # FIXME
+        args      => [qw(-E -e NEW,DESTROY -o timestamp -n)],
+    },
+    ptee => {
+        progname => 'ptee',
+        args     => '/etc/ptee.conf',
+    },
+    flow_import => {
+        progname => 'flow-import',
+        args     => [qw(-z0 -f2 -V5 -m0xFF31EF)],
+    },
+    flow_send => {
+        progname => 'flow-send',
+        args     => [qw(-V5 -s [% primaryIp %]/192.76.34.14/[% netflowport %])], # FIXME
+    },
+}, $config);
+
+# locate the required externals
+my $conntrack = &can_run($config->{conntrack}->{progname})
+    or die "Failed to find a local copy of conntrack in the path\n";
+# then ct2ft
+my $ptee = &can_run($config->{ptee}->{progname})
+    or die "Failed to find a local copy of ptee in the path\n";
+my $flow_import = &can_run($config->{flow_import}->{progname})
+    or die "Failed to find a local copy of flow-import in the path\n";
+my $flow_send = &can_run($config->{flow_send}->{progname})
+    or die "Failed to find a local copy of flow-send in the path\n";
+
+
+
+
+
+# check if we have a program installed, and locate it
+# borrowed from IPC::Cmd
+sub can_run {
+    my $command = shift;
+
+    use Config;
+    require File::Spec;
+    require ExtUtils::MakeMaker;
+
+    if( File::Spec->file_name_is_absolute($command) ) {
+        return MM->maybe_command($command);
+    }
+    else {
+        for my $dir (
+            (split /\Q$Config{path_sep}\E/, $ENV{PATH}),
+            File::Spec->curdir
+        ) {           
+            my $abs = File::Spec->catfile($dir, $command);
+            return $abs if $abs = MM->maybe_command($abs);
+        }
+    }
+}
+
+# recursively merge two hashes together with right-hand precedence
+# borrowed from Catalyst::Utils
+sub merge_hashes {
+    my ( $lefthash, $righthash ) = @_;
+
+    return $lefthash unless defined $righthash;
+
+    my %merged = %$lefthash;
+    for my $key ( keys %$righthash ) {
+        my $right_ref = ( ref $righthash->{ $key } || '' ) eq 'HASH';
+        my $left_ref  = ( ( exists $lefthash->{ $key } && ref $lefthash->{ $key } ) || '' ) eq 'HASH';
+        if( $right_ref and $left_ref ) {
+            $merged{ $key } = merge_hashes(
+                $lefthash->{ $key }, $righthash->{ $key }
+            );
+        }
+        else {
+            $merged{ $key } = $righthash->{ $key };
+        }
+    }
+
+    return \%merged;
+}
+
+# bail out with a help message
+sub quit_with_help {
+    print <<HELPEND;
+nfflowd - convert Linux NetFilter connection messages to Cisco Netflow
+          (version $VERSION)
+usage:
+    nfflowd [--help] [--config=/etc/nfflowd.conf]
+
+options:
+    -h or --help
+        Prints this help message.
+
+    -c or --config=
+        Pass a configuration file location to override the built-in
+        defaults, or the default location of /etc/nfflowd.conf.
+
+HELPEND
+    exit 0;
+}
+
+__END__
+
+=head1 AUTHOR
+
+Oliver Gorwits C<< <oliver.gorwits@oucs.ox.ac.uk> >>
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright (c) The University of Oxford 2008.
+
+This library is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+=cut
+
