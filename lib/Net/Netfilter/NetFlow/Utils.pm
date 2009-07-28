@@ -13,7 +13,7 @@ our @EXPORT = qw(
 );
 
 use File::ShareDir;
-use Config::Any;
+use Config::Any 0.15;
 
 my $VERSION = '0.01';
 $VERSION = eval $VERSION; # numify for warning-free dev releases
