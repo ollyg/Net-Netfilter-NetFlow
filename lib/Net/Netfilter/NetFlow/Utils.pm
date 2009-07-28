@@ -12,7 +12,6 @@ our @EXPORT = qw(
     quit_with_help
 );
 
-use File::ShareDir;
 use Config::Any 0.15;
 
 our $VERSION = '0.01';
@@ -20,17 +19,14 @@ $VERSION = eval $VERSION; # numify for warning-free dev releases
 
 # use Config::Any to load a configuration file
 sub load_config {
-    my $file = shift;
-    my $path = ($file =~ m{^/}
-        ? (File::ShareDir::dist_dir('Net-Nfflowd') .'/') : '');
-    my $name = $path . $file;
-
+    my $name = shift;
+    die "No filename specified to load_config!\n" if !defined $name;
     my $config = eval{ Config::Any->load_files({
         files => [$name],
+        use_ext => 1,
         flatten_to_hash => 1,
     })->{$name} };
     die "Failed to load config [$name]\n" if $@ or !defined $config;
-
     return $config;
 }
 
@@ -39,7 +35,7 @@ sub format_args {
     my $stub = shift;
     my $pre  = shift || ''; # maybe init
     my $rv = sprintf $stub->{"${pre}format"},
-        @{$stub->{"${pre}format"} || []};
+        @{$stub->{"${pre}args"} || []};
     return split /\s+/, $rv;
 }
 

@@ -24,7 +24,7 @@ $help and &quit_with_help;
 my $local_config = load_config('nfflowd.conf');
 my $config = eval{ load_config($config_file) };
 if ($@ and $config_file ne $DEFAULT_CONFIG_FILE) {
-    die "Failed to load requested config\n"
+    die "Failed to load requested config [$config_file]\n"
 }
 
 # mix in the built-ins

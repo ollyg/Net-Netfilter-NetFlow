@@ -4,8 +4,6 @@ perl_version '5.008001';
 name        'Net-Netfilter-NetFlow';
 all_from    'lib/Net/Netfilter/NetFlow/Utils.pm';
 
-install_script  'nfflowd';
-
 requires    'Config'              => 0;
 requires    'POSIX'               => 0;
 requires    'Exporter'            => 0;
@@ -23,6 +21,9 @@ recommends  'Config::General' => 0;
 test_requires  'Test::More' => 0;
 test_requires  'Test::Pod'  => 0;
 test_requires  'Test::Pod::Coverage' => 0;
+
+install_share;
+install_script  'script/nfflowd';
 
 WriteAll;
 
