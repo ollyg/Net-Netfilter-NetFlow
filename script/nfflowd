@@ -4,6 +4,7 @@ use strict;
 use warnings FATAL => 'all';
 
 use Net::Netfilter::NetFlow::Utils;
+use Net::Netfilter::NetFlow::Process;
 
 use IPC::Run qw(run);
 use Getopt::Long; # core
@@ -44,58 +45,10 @@ my $flow_send = can_run($config->{flow_send}->{progname})
 
 # MAIN BODY
 run [$conntrack, format($config->{conntrack})],
-        \undef, init => \&conntrack_init,
-    '|', \&ct2ft, '|', \&ptee, '|',
+        \undef, init => conntrack_init($config),
+    '|', ct2ft($config), '|', ptee($config), '|',
     [$flow_import, format($config->{flow_import})],
     '|', [$flow_send, format($config->{flow_send})];
-
-
-# poke conntrack kernel hooks into waking up (bug?)
-sub conntrack_init {
-    run [$conntrack, &format($config->{conntrack}, 'init_')],
-        '>', '/dev/null', '2>&1';
-}
-
-# convert the conntrack output to flow-tools CSV input format
-sub ct2ft {
-    # respond to SIGHUP (thanks go to perlipc man page)
-    use POSIX; # core
-    use Time::HiRes 'gettimeofday'; # core
-
-    # clean up NEW entries which have not had DESTROY in TTL seconds
-    my $TTL = $ENV{TTL} || (60 * 60 * 24 * 7); # seven days
-
-    sub alrm_handler {
-        # warn "Purging tracked connections older than $TTL seconds\n";
-        foreach my $p (keys %{$tracker}) {
-            foreach my $k (keys %{$tracker->{$_}}) {
-                delete $tracker->{$p}->{$k}
-                    if $tracker->{$p}->{$k} < ($^T - $TTL);
-            }   
-        }   
-    }
-
-    # POSIX unmasks the sigprocmask properly
-    my $sigset = POSIX::SigSet->new;
-    my $action = POSIX::SigAction->new(
-        'alrm_handler', $sigset, &POSIX::SA_NODEFER
-    );
-    POSIX::sigaction(&POSIX::SIGALRM, $action);
-}
-
-# set up output tee to local syslog, and next process in pipe
-sub ptee {
-    use Log::Dispatch::Config;
-    use Log::Dispatch::Configurator::Any;
-
-    Log::Dispatch::Config->configure_and_watch(
-        Log::Dispatch::Configurator::Any->new($config->{ptee}->{conf}) );
-    my $dispatcher = Log::Dispatch::Config->instance;
-
-    while (<>) {
-        $dispatcher->notice($_);
-    }
-}
 
 __END__
 
