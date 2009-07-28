@@ -7,53 +7,77 @@ use Net::Netfilter::NetFlow::Utils;
 use Net::Netfilter::NetFlow::Process;
 
 use Getopt::Long; # core
+use Daemon::Generic;
 use File::ShareDir;
-use IPC::Run 'run';
+use IPC::Run qw(run kill_kill);
 
-my $DEFAULT_CONFIG_FILE = '/etc/nfflowd.conf';
-my $config_file = $DEFAULT_CONFIG_FILE;
-my $help ='';
+our $VERSION = '0.02';
+$VERSION = eval $VERSION; # numify for warning-free dev releases
 
-my $result = GetOptions(
-    'h|help'     => \$help,
-    'c|config=s' => \$config_file,
+newdaemon(
+    progname => 'nfflowd',
 );
-$help and &quit_with_help;
 
-# bootstrap configuration:
-# try requested, then default loc, then built-ins
-my $sharedir = File::ShareDir::dist_dir('Net-Netfilter-NetFlow');
-my $local_config = load_config($sharedir .'/nfflowd.conf');
-my $config = eval{ load_config($config_file) };
-if ($@ and $config_file ne $DEFAULT_CONFIG_FILE) {
-    die "Failed to load requested config [$config_file]\n"
+sub gd_preconfig {
+    my $self = shift;
+    my $config_file = $self->{configfile}; # /etc/nfflowd.conf
+
+    # bootstrap configuration:
+    # try requested, then default loc, then built-ins
+    my $sharedir = File::ShareDir::dist_dir('Net-Netfilter-NetFlow');
+    my $local_config = load_config($sharedir .'/nfflowd.conf');
+    my $config = eval{ load_config($config_file) };
+    if ($@ and $config_file ne '/etc/nfflowd.conf') {
+        die "Failed to load requested config [$config_file]\n"
+    }
+
+    # mix in the built-ins
+    $config = merge_hashes($local_config, $config);
+
+    # make sure we have args for the flow_send app
+    if (ref $config->{flow_send}->{args} ne 'ARRAY'
+        or scalar @{$config->{flow_send}->{args}} ne 3
+    ) {
+        die "You must supply three arguments for flow_send: source addr, dest addr, dest port\n";
+    }
+
+    return %$config;
 }
 
-# mix in the built-ins
-$config = merge_hashes($local_config, $config);
-
-# make sure we have args for the flow_send app
-if (ref $config->{flow_send}->{args} ne 'ARRAY'
-    or scalar @{$config->{flow_send}->{args}} ne 3
-) {
-    die "You must supply three arguments for flow_send: source addr, dest addr, dest port\n";
+sub gd_postconfig {
+    my $self = shift;
+    $self->{nf_config} = {@_};
 }
 
-# locate the required externals
-my $conntrack = can_run($config->{conntrack}->{progname})
-    or die "Failed to find a local copy of conntrack in the path\n";
-my $flow_import = can_run($config->{flow_import}->{progname})
-    or die "Failed to find a local copy of flow-import in the path\n";
-my $flow_send = can_run($config->{flow_send}->{progname})
-    or die "Failed to find a local copy of flow-send in the path\n";
+sub gd_run {
+    my $self = shift;
+    my $config = $self->{nf_config};
 
-# MAIN BODY
-run [$conntrack, format_args($config->{conntrack})],
-        \undef, init => sub { conntrack_init($config) },
-    '|', sub { ct2ft($config) },
-    '|', sub { ptee($config) },
-    '|', [$flow_import, format_args($config->{flow_import})],
-    '|', [$flow_send, format_args($config->{flow_send})];
+    # clear this because Daemon::Generic leaves "start" in there
+    # which confuses things later on as they see a file to open for STDIN
+    @ARGV = ();
+
+    # respond to SIGINT which Daemon::Generic sends us on "stop"
+    my $int_handler = sub { kill_kill };
+    my $action = POSIX::SigAction->new($int_handler);
+    POSIX::sigaction(&POSIX::SIGINT, $action);
+
+    # locate the required externals
+    my $conntrack = can_run($config->{conntrack}->{progname})
+        or die "Failed to find a local copy of conntrack in the path\n";
+    my $flow_import = can_run($config->{flow_import}->{progname})
+        or die "Failed to find a local copy of flow-import in the path\n";
+    my $flow_send = can_run($config->{flow_send}->{progname})
+        or die "Failed to find a local copy of flow-send in the path\n";
+
+    # MAIN BODY
+    run [$conntrack, format_args($config->{conntrack})],
+            \undef, init => sub { conntrack_init($config) },
+        '|', sub { ct2ft($config) },
+        '|', sub { ptee($config) },
+        '|', [$flow_import, format_args($config->{flow_import})],
+        '|', [$flow_send, format_args($config->{flow_send})];
+}
 
 __END__
 

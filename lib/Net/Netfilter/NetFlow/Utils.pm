@@ -9,13 +9,9 @@ our @EXPORT = qw(
     format_args
     can_run
     merge_hashes
-    quit_with_help
 );
 
 use Config::Any 0.15;
-
-our $VERSION = '0.01';
-$VERSION = eval $VERSION; # numify for warning-free dev releases
 
 # use Config::Any to load a configuration file
 sub load_config {
@@ -83,26 +79,6 @@ sub merge_hashes {
     }
 
     return \%merged;
-}
-
-# bail out with a help message
-sub quit_with_help {
-    print <<HELPEND;
-nfflowd - convert Linux NetFilter connection messages to Cisco Netflow
-          (version $VERSION)
-usage:
-    nfflowd [--help] [--config=/etc/nfflowd.conf]
-
-options:
-    -h or --help
-        Prints this help message.
-
-    -c or --config=
-        Pass a configuration file location to override the built-in
-        defaults, or the default location of /etc/nfflowd.conf.
-
-HELPEND
-    exit 0;
 }
 
 __END__

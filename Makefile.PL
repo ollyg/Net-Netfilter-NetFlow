@@ -2,7 +2,7 @@ use inc::Module::Install 0.67;
 perl_version '5.008001';
   
 name        'Net-Netfilter-NetFlow';
-all_from    'lib/Net/Netfilter/NetFlow/Utils.pm';
+all_from    'script/nfflowd';
 
 requires    'Config'              => 0;
 requires    'POSIX'               => 0;
@@ -13,8 +13,9 @@ requires    'File::Spec'          => 0;
 requires    'ExtUtils::MakeMaker' => 0;
 
 requires    'Log::Dispatch::Configurator::Any' => '1.0005';
-requires    'File::ShareDir' => 0;
-requires    'IPC::Run'       => 0;
+requires    'Daemon::Generic' => 0;
+requires    'File::ShareDir'  => 0;
+requires    'IPC::Run'        => 0;
 
 recommends  'Config::General' => 0;
 

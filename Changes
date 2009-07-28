@@ -1,3 +1,9 @@
+libnet-netfilter-netflow-perl (0.02) UNRELEASED; urgency=low
+
+  * Switch to Daemon::Generic to manage background running
+
+ -- Oliver Gorwits <oliver.gorwits@oucs.ox.ac.uk>  Tue, 28 Jul 2009 17:11:21 +0100
+
 libnet-netfilter-netflow-perl (0.01) UNRELEASED; urgency=low
 
   * Initial release.
