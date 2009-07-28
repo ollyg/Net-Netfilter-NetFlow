@@ -5,9 +5,7 @@ use warnings FATAL => 'all';
 
 use IPC::Run qw(run);
 use Config::Tiny ();
-use Getopt::Long;
-#use Log::Dispatch::Config;
-#use Log::Dispatch::Configurator::Any;
+use Getopt::Long; # core
 
 my $VERSION = '1.01';
 $VERSION = eval $VERSION; # numify for warning-free dev releases
@@ -32,21 +30,34 @@ if (!defined $config and $config_file ne $DEFAULT_CONFIG_FILE) {
 # mix in the built-ins
 $config = &merge_hashes({
     conntrack => {
-        progname  => 'conntrack',
-        init_args => [qw(-L >/dev/null 2>&1)], # FIXME
-        args      => [qw(-E -e NEW,DESTROY -o timestamp -n)],
+        progname    => 'conntrack',
+        init_format => '-L',
+        format      => '-E -e NEW,DESTROY -o timestamp -n',
     },
     ptee => {
-        progname => 'ptee',
-        args     => '/etc/ptee.conf',
+        conf => {
+            dispatchers => ['screen', 'syslog'],
+            screen => {
+                class     => 'Log::Dispatch::Screen',
+                min_level => 'debug',
+                stderr    => 0,
+            },
+            syslog => {
+                class     => 'Log::Dispatch::Syslog',
+                min_level => 'debug',
+                facility  => 'local6',
+                ident     => 'conntrack',
+            },
+        },
     },
     flow_import => {
         progname => 'flow-import',
-        args     => [qw(-z0 -f2 -V5 -m0xFF31EF)],
+        format   => '-z0 -f2 -V5 -m0xFF31EF',
     },
     flow_send => {
         progname => 'flow-send',
-        args     => [qw(-V5 -s [% primaryIp %]/192.76.34.14/[% netflowport %])], # FIXME
+        format   => '-V5 -s %s/%s/%s',
+        args     => ['[% primaryIp %]i', '192.76.34.14', '[% netflowport %]'],
     },
 }, $config);
 
@@ -54,16 +65,75 @@ $config = &merge_hashes({
 my $conntrack = &can_run($config->{conntrack}->{progname})
     or die "Failed to find a local copy of conntrack in the path\n";
 # then ct2ft
-my $ptee = &can_run($config->{ptee}->{progname})
-    or die "Failed to find a local copy of ptee in the path\n";
+# then ptee
 my $flow_import = &can_run($config->{flow_import}->{progname})
     or die "Failed to find a local copy of flow-import in the path\n";
 my $flow_send = &can_run($config->{flow_send}->{progname})
     or die "Failed to find a local copy of flow-send in the path\n";
 
+# MAIN BODY
+run [$conntrack, &format($config->{conntrack})],
+        \undef, init => \&conntrack_init,
+    '|', \&ct2ft, '|', \&ptee, '|',
+    [$flow_import, &format($config->{flow_import})],
+    '|', [$flow_send, &format($config->{flow_send})];
 
 
+# poke conntrack kernel hooks into waking up (bug?)
+sub conntrack_init {
+    run [$conntrack, &format($config->{conntrack}, 'init_')],
+        '>', '/dev/null', '2>&1';
+}
 
+# convert the conntrack output to flow-tools CSV input format
+sub ct2ft {
+    # respond to SIGHUP (thanks go to perlipc man page)
+    use POSIX; # core
+    use Time::HiRes 'gettimeofday'; # core
+
+    # clean up NEW entries which have not had DESTROY in TTL seconds
+    my $TTL = $ENV{TTL} || (60 * 60 * 24 * 7); # seven days
+
+    sub alrm_handler {
+        # warn "Purging tracked connections older than $TTL seconds\n";
+        foreach my $p (keys %{$tracker}) {
+            foreach my $k (keys %{$tracker->{$_}}) {
+                delete $tracker->{$p}->{$k}
+                    if $tracker->{$p}->{$k} < ($^T - $TTL);
+            }   
+        }   
+    }
+
+    # POSIX unmasks the sigprocmask properly
+    my $sigset = POSIX::SigSet->new;
+    my $action = POSIX::SigAction->new(
+        'alrm_handler', $sigset, &POSIX::SA_NODEFER
+    );
+    POSIX::sigaction(&POSIX::SIGALRM, $action);
+}
+
+# set up output tee to local syslog, and next process in pipe
+sub ptee {
+    use Log::Dispatch::Config;
+    use Log::Dispatch::Configurator::Any;
+
+    Log::Dispatch::Config->configure_and_watch(
+        Log::Dispatch::Configurator::Any->new($config->{ptee}->{conf}) );
+    my $dispatcher = Log::Dispatch::Config->instance;
+
+    while (<>) {
+        $dispatcher->notice($_);
+    }
+}
+
+# interpolate the config vars
+sub format {
+    my $stub = shift;
+    my $pre  = shift || ''; # maybe init
+    my $rv = sprintf $stub->{"${pre}format"},
+        @{$stub->{"${pre}_format"} || []};
+    return split '\s+', $rv;
+}
 
 # check if we have a program installed, and locate it
 # borrowed from IPC::Cmd
