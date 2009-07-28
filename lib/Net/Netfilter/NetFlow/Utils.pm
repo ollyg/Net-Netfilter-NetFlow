@@ -6,7 +6,7 @@ use warnings FATAL => 'all';
 use base 'Exporter';
 our @EXPORT = qw(
     load_config
-    format
+    format_args
     can_run
     merge_hashes
     quit_with_help
@@ -35,12 +35,12 @@ sub load_config {
 }
 
 # interpolate the config vars
-sub format {
+sub format_args {
     my $stub = shift;
     my $pre  = shift || ''; # maybe init
     my $rv = sprintf $stub->{"${pre}format"},
-        @{$stub->{"${pre}_format"} || []};
-    return split '\s+', $rv;
+        @{$stub->{"${pre}format"} || []};
+    return split /\s+/, $rv;
 }
 
 # check if we have a program installed, and locate it

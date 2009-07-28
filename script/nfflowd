@@ -6,7 +6,7 @@ use warnings FATAL => 'all';
 use Net::Netfilter::NetFlow::Utils;
 use Net::Netfilter::NetFlow::Process;
 
-use IPC::Run qw(run);
+use IPC::Run 'run';
 use Getopt::Long; # core
 
 my $DEFAULT_CONFIG_FILE = '/etc/nfflowd.conf';
@@ -41,11 +41,11 @@ my $flow_send = can_run($config->{flow_send}->{progname})
     or die "Failed to find a local copy of flow-send in the path\n";
 
 # MAIN BODY
-run [$conntrack, format($config->{conntrack})],
+run [$conntrack, format_args($config->{conntrack})],
         \undef, init => conntrack_init($config),
     '|', ct2ft($config), '|', ptee($config), '|',
-    [$flow_import, format($config->{flow_import})],
-    '|', [$flow_send, format($config->{flow_send})];
+    [$flow_import, format_args($config->{flow_import})],
+    '|', [$flow_send, format_args($config->{flow_send})];
 
 __END__
 

@@ -12,6 +12,7 @@ our @EXPORT = qw(
 
 use POSIX; # core
 use Time::HiRes 'gettimeofday'; # core
+use IPC::Run 'run';
 use Log::Dispatch::Config;
 use Log::Dispatch::Configurator::Any;
 use Net::Netfilter::NetFlow::Utils;
@@ -23,7 +24,7 @@ sub conntrack_init {
     my $conntrack = can_run($config->{conntrack}->{progname})
         or die "Failed to find a local copy of conntrack in the path\n";
 
-    run [$conntrack, format($config->{conntrack}, 'init_')],
+    run [$conntrack, format_args($config->{conntrack}, 'init_')],
         '>', '/dev/null', '2>&1';
 }
 
