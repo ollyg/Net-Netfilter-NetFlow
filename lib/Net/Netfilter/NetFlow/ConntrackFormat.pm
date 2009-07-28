@@ -15,20 +15,20 @@ our @EXPORT = qw(
 # 17:udp - src,sport,src,sport,dst,dport
 # first src is private, second is public (post SNAT)
 
-my %ct_new_key = (
+our %ct_new_key = (
     1  => [4,11,5,8],
     6  => [5,7,11,13,6,8],
     17 => [4,6,10,12,5,7],
 );
 
-my %ct_destroy_key = (
+our %ct_destroy_key = (
     1  => [3,11,4,7],
     6  => [3,5,10,12,4,6],
     17 => [3,5,10,12,4,6],
 );
 
 # dpkts, doctets, srcaddr, dstaddr, srcport, dstport
-my %ct_mask_fields = (
+our %ct_mask_fields = (
     1 => {
         # field 17 does not exist
         private_src => [8,9,3,4,17,17],
