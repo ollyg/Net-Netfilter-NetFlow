@@ -7,11 +7,12 @@ use Net::Netfilter::NetFlow::Utils;
 use Net::Netfilter::NetFlow::Process;
 
 use Getopt::Long; # core
+use Config::General;
 use Daemon::Generic;
-use File::ShareDir;
+use File::Slurp 9999.06;
 use IPC::Run qw(run kill_kill);
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 $VERSION = eval $VERSION; # numify for warning-free dev releases
 
 newdaemon(
@@ -24,8 +25,8 @@ sub gd_preconfig {
 
     # bootstrap configuration:
     # try requested, then default loc, then built-ins
-    my $sharedir = File::ShareDir::dist_dir('Net-Netfilter-NetFlow');
-    my $local_config = load_config($sharedir .'/nfflowd.conf');
+    my $local_config = Config::General::ParseConfig(
+        -String => scalar read_file(\*DATA));
     my $config = eval{ load_config($config_file) };
     if ($@ and $config_file ne '/etc/nfflowd.conf') {
         die "Failed to load requested config [$config_file]\n"
@@ -78,6 +79,39 @@ sub gd_run {
         '|', [$flow_import, format_args($config->{flow_import})],
         '|', [$flow_send, format_args($config->{flow_send})];
 }
+
+__DATA__
+
+<conntrack>
+    progname    conntrack
+    init_format -L
+    format      -E -e NEW,DESTROY -o timestamp -n
+</conntrack>
+<ptee>
+    <conf>
+        dispatchers screen
+        dispatchers syslog
+        <screen>
+            stderr    0
+            class     Log::Dispatch::Screen
+            min_level debug
+        </screen>
+        <syslog>
+            class     Log::Dispatch::Syslog
+            ident     conntrack
+            min_level debug
+            facility  local6
+        </syslog>
+    </conf>
+</ptee>
+<flow_import>
+    progname flow-import
+    format   -z0 -f2 -V5 -m0xFF31EF
+</flow_import>
+<flow_send>
+    progname flow-send
+    format   -V5 -s %s/%s/%s
+</flow_send>
 
 __END__
 

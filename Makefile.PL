@@ -14,7 +14,7 @@ requires    'ExtUtils::MakeMaker' => 0;
 
 requires    'Log::Dispatch::Configurator::Any' => '1.0005';
 requires    'Daemon::Generic' => 0;
-requires    'File::ShareDir'  => 0;
+requires    'File::Slurp'     => '9999.06';
 requires    'IPC::Run'        => 0;
 
 recommends  'Config::General' => 0;
