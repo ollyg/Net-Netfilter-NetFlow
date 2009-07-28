@@ -12,7 +12,7 @@ use Daemon::Generic;
 use File::Slurp 9999.06;
 use IPC::Run qw(run kill_kill);
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 $VERSION = eval $VERSION; # numify for warning-free dev releases
 
 newdaemon(
@@ -25,14 +25,14 @@ sub gd_preconfig {
 
     # bootstrap configuration:
     # try requested, then default loc, then built-ins
-    my $local_config = Config::General::ParseConfig(
-        -String => scalar read_file(\*DATA));
     my $config = eval{ load_config($config_file) };
     if ($@ and $config_file ne '/etc/nfflowd.conf') {
         die "Failed to load requested config [$config_file]\n"
     }
 
     # mix in the built-ins
+    my $local_config = {Config::General->new(
+        -String => read_file(\*DATA, array_ref => 1))->getall};
     $config = merge_hashes($local_config, $config);
 
     # make sure we have args for the flow_send app
@@ -80,8 +80,21 @@ sub gd_run {
         '|', [$flow_send, format_args($config->{flow_send})];
 }
 
-__DATA__
 
+=head1 AUTHOR
+
+Oliver Gorwits C<< <oliver.gorwits@oucs.ox.ac.uk> >>
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright (c) The University of Oxford 2009.
+
+This library is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+=cut
+
+__DATA__
 <conntrack>
     progname    conntrack
     init_format -L
@@ -112,19 +125,3 @@ __DATA__
     progname flow-send
     format   -V5 -s %s/%s/%s
 </flow_send>
-
-__END__
-
-=head1 AUTHOR
-
-Oliver Gorwits C<< <oliver.gorwits@oucs.ox.ac.uk> >>
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) The University of Oxford 2009.
-
-This library is free software; you can redistribute it and/or modify it under
-the same terms as Perl itself.
-
-=cut
-
