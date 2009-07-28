@@ -5,9 +5,9 @@ use warnings FATAL => 'all';
 
 use base 'Exporter';
 our @EXPORT = qw(
-    ct_new_key
-    ct_destroy_key
-    ct_mask_fields
+    %ct_new_key
+    %ct_destroy_key
+    %ct_mask_fields
 );
 
 # 1:icmp - src,src,dst,id

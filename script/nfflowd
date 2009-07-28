@@ -30,11 +30,16 @@ if ($@ and $config_file ne $DEFAULT_CONFIG_FILE) {
 # mix in the built-ins
 $config = merge_hashes($local_config, $config);
 
+# make sure we have args for the flow_send app
+if (ref $config->{flow_send}->{args} ne 'ARRAY'
+    or scalar @{$config->{flow_send}->{args}} ne 3
+) {
+    die "You must supply three arguments for flow_send: source addr, dest addr, dest port\n";
+}
+
 # locate the required externals
 my $conntrack = can_run($config->{conntrack}->{progname})
     or die "Failed to find a local copy of conntrack in the path\n";
-# then ct2ft
-# then ptee
 my $flow_import = can_run($config->{flow_import}->{progname})
     or die "Failed to find a local copy of flow-import in the path\n";
 my $flow_send = can_run($config->{flow_send}->{progname})
@@ -43,8 +48,9 @@ my $flow_send = can_run($config->{flow_send}->{progname})
 # MAIN BODY
 run [$conntrack, format_args($config->{conntrack})],
         \undef, init => conntrack_init($config),
-    '|', ct2ft($config), '|', ptee($config), '|',
-    [$flow_import, format_args($config->{flow_import})],
+    '|', ct2ft($config),
+    '|', ptee($config),
+    '|', [$flow_import, format_args($config->{flow_import})],
     '|', [$flow_send, format_args($config->{flow_send})];
 
 __END__

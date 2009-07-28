@@ -35,9 +35,9 @@ sub ct2ft {
     my $tracker = {};
 
     # respond to SIGALRM (thanks go to perlipc man page)
-    sub alrm_handler { ++$got_alrm }
+    my $alrm_handler = sub { ++$got_alrm };
     # POSIX unmasks the sigprocmask properly
-    my $action = POSIX::SigAction->new('alrm_handler');
+    my $action = POSIX::SigAction->new($alrm_handler);
     POSIX::sigaction(&POSIX::SIGALRM, $action);
 
     my $ttl = $config->{ct2ft}->{ttl} || 60 * 60 * 24 * 7; # seven days;
@@ -75,12 +75,12 @@ sub ct2ft {
             (($fields[5] ne '8') and ($fields[6] ne '8')); # only interested in ECHO
 
         if ($mode eq 'NEW') {
-            my $key = join ',', @fields[ @{$new_key{$proto}} ];
+            my $key = join ',', @fields[ @{$ct_new_key{$proto}} ];
             $tracker->{$proto}->{$key} = $fields[0];
             next;
         }   
 
-        my $key = join ',', @fields[ @{$destroy_key{$proto}} ];
+        my $key = join ',', @fields[ @{$ct_destroy_key{$proto}} ];
         next unless exists $tracker->{$proto}->{$key};
 
         my ($start_secs, $start_micsecs) = split /\./, $tracker->{$proto}->{$key};
@@ -99,13 +99,13 @@ sub ct2ft {
 
         for my $dir (qw( private_src public_src dst )) {
             my ($dpkts, $doctets, $srcaddr, $dstaddr, $srcport, $dstport)
-                = @fields[ @{$mask_fields{$proto}{$dir}} ];
+                = @fields[ @{$ct_mask_fields{$proto}{$dir}} ];
 
             print join ',',
                 $unix_secs,
                 $unix_nsecs,
                 $sysuptime,
-                $ENV{EXADDR} || $address,
+                $config->{flow_send}->{args}->[0] || '127.0.0.1',
                 $dpkts,
                 $doctets,
                 $first,
