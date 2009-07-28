@@ -12,12 +12,44 @@ use Daemon::Generic;
 use File::Slurp 9999.06;
 use IPC::Run qw(run kill_kill);
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 $VERSION = eval $VERSION; # numify for warning-free dev releases
 
 newdaemon(
-    progname => 'nfflowd',
+    progname    => 'nfflowd',
+    logpriority => 'daemon.info',
 );
+
+# override from Daemon::Generic
+sub gd_redirect_output {
+    my $self = shift;
+    return if $self->{gd_foreground};
+    my $logname = $self->gd_logname;
+    my $p = $self->{gd_logpriority} ? "-p $self->{gd_logpriority}" : "";
+    open(STDERR, "|logger $p -t '$logname'") or (print "could not open stderr: $!" && exit(1));
+
+    # don't mess with STDOUT because it upsets IPC::Run
+    #close(STDOUT);
+    #open(STDOUT, ">&STDERR") or die "redirect STDOUT -> STDERR: $!";
+}
+
+# override from Daemon::Generic
+sub gd_daemonize {
+    my $self = shift;
+    print "Starting $self->{gd_progname} server\n";
+    $self->gd_redirect_output();
+    my $pid;
+    POSIX::_exit(0) if $pid = fork;
+    die "Could not fork: $!" unless defined $pid;
+    POSIX::_exit(0) if $pid = fork;
+    die "Could not fork: $!" unless defined $pid;
+
+    POSIX::setsid();
+    # don't mess with STDERR because it upsets IPC::Run
+    #select(STDERR);
+    #$| = 1;
+    print STDERR "Sucessfully daemonized\n";
+}
 
 sub gd_preconfig {
     my $self = shift;

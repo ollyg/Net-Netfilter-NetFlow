@@ -1,8 +1,14 @@
+libnet-netfilter-netflow-perl (0.05) UNRELEASED; urgency=low
+
+  * Fixes to Daemon::Generic interfering with STDOUT/STDERR and upsetting IPC::Run
+
+ -- Oliver Gorwits <oliver.gorwits@oucs.ox.ac.uk>  Tue, 28 Jul 2009 20:49:27 +0100
+
 libnet-netfilter-netflow-perl (0.04) UNRELEASED; urgency=low
 
   * Fix bugs in use of Config::General with File::Slurp 
 
- -- Oliver Gorwits <oliver@lilac.oucs.ox.ac.uk>  Tue, 28 Jul 2009 19:06:20 +0100
+ -- Oliver Gorwits <oliver.gorwits@oucs.ox.ac.uk>  Tue, 28 Jul 2009 19:06:20 +0100
 
 libnet-netfilter-netflow-perl (0.03) UNRELEASED; urgency=low
 
