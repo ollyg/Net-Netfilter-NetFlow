@@ -3,8 +3,9 @@
 use strict;
 use warnings FATAL => 'all';
 
+use Net::Netfilter::NetFlow::Utils;
+
 use IPC::Run qw(run);
-use Config::Tiny ();
 use Getopt::Long; # core
 
 my $VERSION = '1.01';
@@ -22,61 +23,31 @@ $help and &quit_with_help;
 
 # bootstrap configuration:
 # try requested, then default loc, then built-ins
-my $config = Config::Tiny->read($config_file);
-if (!defined $config and $config_file ne $DEFAULT_CONFIG_FILE) {
+my $local_config = load_config('nfflowd.conf');
+my $config = eval{ load_config($config_file) };
+if ($@ and $config_file ne $DEFAULT_CONFIG_FILE) {
     die "Failed to load requested config: $Config::Tiny::errstr\n"
 }
 
 # mix in the built-ins
-$config = &merge_hashes({
-    conntrack => {
-        progname    => 'conntrack',
-        init_format => '-L',
-        format      => '-E -e NEW,DESTROY -o timestamp -n',
-    },
-    ptee => {
-        conf => {
-            dispatchers => ['screen', 'syslog'],
-            screen => {
-                class     => 'Log::Dispatch::Screen',
-                min_level => 'debug',
-                stderr    => 0,
-            },
-            syslog => {
-                class     => 'Log::Dispatch::Syslog',
-                min_level => 'debug',
-                facility  => 'local6',
-                ident     => 'conntrack',
-            },
-        },
-    },
-    flow_import => {
-        progname => 'flow-import',
-        format   => '-z0 -f2 -V5 -m0xFF31EF',
-    },
-    flow_send => {
-        progname => 'flow-send',
-        format   => '-V5 -s %s/%s/%s',
-        args     => ['[% primaryIp %]i', '192.76.34.14', '[% netflowport %]'],
-    },
-}, $config);
+$config = merge_hashes($local_config, $config);
 
 # locate the required externals
-my $conntrack = &can_run($config->{conntrack}->{progname})
+my $conntrack = can_run($config->{conntrack}->{progname})
     or die "Failed to find a local copy of conntrack in the path\n";
 # then ct2ft
 # then ptee
-my $flow_import = &can_run($config->{flow_import}->{progname})
+my $flow_import = can_run($config->{flow_import}->{progname})
     or die "Failed to find a local copy of flow-import in the path\n";
-my $flow_send = &can_run($config->{flow_send}->{progname})
+my $flow_send = can_run($config->{flow_send}->{progname})
     or die "Failed to find a local copy of flow-send in the path\n";
 
 # MAIN BODY
-run [$conntrack, &format($config->{conntrack})],
+run [$conntrack, format($config->{conntrack})],
         \undef, init => \&conntrack_init,
     '|', \&ct2ft, '|', \&ptee, '|',
-    [$flow_import, &format($config->{flow_import})],
-    '|', [$flow_send, &format($config->{flow_send})];
+    [$flow_import, format($config->{flow_import})],
+    '|', [$flow_send, format($config->{flow_send})];
 
 
 # poke conntrack kernel hooks into waking up (bug?)
@@ -124,82 +95,6 @@ sub ptee {
     while (<>) {
         $dispatcher->notice($_);
     }
-}
-
-# interpolate the config vars
-sub format {
-    my $stub = shift;
-    my $pre  = shift || ''; # maybe init
-    my $rv = sprintf $stub->{"${pre}format"},
-        @{$stub->{"${pre}_format"} || []};
-    return split '\s+', $rv;
-}
-
-# check if we have a program installed, and locate it
-# borrowed from IPC::Cmd
-sub can_run {
-    my $command = shift;
-
-    use Config;
-    require File::Spec;
-    require ExtUtils::MakeMaker;
-
-    if( File::Spec->file_name_is_absolute($command) ) {
-        return MM->maybe_command($command);
-    }
-    else {
-        for my $dir (
-            (split /\Q$Config{path_sep}\E/, $ENV{PATH}),
-            File::Spec->curdir
-        ) {           
-            my $abs = File::Spec->catfile($dir, $command);
-            return $abs if $abs = MM->maybe_command($abs);
-        }
-    }
-}
-
-# recursively merge two hashes together with right-hand precedence
-# borrowed from Catalyst::Utils
-sub merge_hashes {
-    my ( $lefthash, $righthash ) = @_;
-
-    return $lefthash unless defined $righthash;
-
-    my %merged = %$lefthash;
-    for my $key ( keys %$righthash ) {
-        my $right_ref = ( ref $righthash->{ $key } || '' ) eq 'HASH';
-        my $left_ref  = ( ( exists $lefthash->{ $key } && ref $lefthash->{ $key } ) || '' ) eq 'HASH';
-        if( $right_ref and $left_ref ) {
-            $merged{ $key } = merge_hashes(
-                $lefthash->{ $key }, $righthash->{ $key }
-            );
-        }
-        else {
-            $merged{ $key } = $righthash->{ $key };
-        }
-    }
-
-    return \%merged;
-}
-
-# bail out with a help message
-sub quit_with_help {
-    print <<HELPEND;
-nfflowd - convert Linux NetFilter connection messages to Cisco Netflow
-          (version $VERSION)
-usage:
-    nfflowd [--help] [--config=/etc/nfflowd.conf]
-
-options:
-    -h or --help
-        Prints this help message.
-
-    -c or --config=
-        Pass a configuration file location to override the built-in
-        defaults, or the default location of /etc/nfflowd.conf.
-
-HELPEND
-    exit 0;
 }
 
 __END__
