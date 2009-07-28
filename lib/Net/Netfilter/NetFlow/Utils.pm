@@ -15,6 +15,9 @@ our @EXPORT = qw(
 use File::ShareDir;
 use Config::Any;
 
+my $VERSION = '1.01';
+$VERSION = eval $VERSION; # numify for warning-free dev releases
+
 # use Config::Any to load a configuration file
 sub load_config {
     my $file = shift;
@@ -26,7 +29,7 @@ sub load_config {
         files => [$name],
         flatten_to_hash => 1,
     })->{$name} };
-    croak "Failed to load config [$name]\n" if !defined $config or $@;
+    die "Failed to load config [$name]\n" if $@ or !defined $config;
 
     return $config;
 }

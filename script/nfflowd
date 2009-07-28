@@ -9,9 +9,6 @@ use Net::Netfilter::NetFlow::Process;
 use IPC::Run qw(run);
 use Getopt::Long; # core
 
-my $VERSION = '1.01';
-$VERSION = eval $VERSION; # numify for warning-free dev releases
-
 my $DEFAULT_CONFIG_FILE = '/etc/nfflowd.conf';
 my $config_file = $DEFAULT_CONFIG_FILE;
 my $help ='';
