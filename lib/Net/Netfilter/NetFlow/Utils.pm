@@ -15,7 +15,7 @@ our @EXPORT = qw(
 use File::ShareDir;
 use Config::Any 0.15;
 
-my $VERSION = '0.01';
+our $VERSION = '0.01';
 $VERSION = eval $VERSION; # numify for warning-free dev releases
 
 # use Config::Any to load a configuration file
