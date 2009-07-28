@@ -49,9 +49,9 @@ my $flow_send = can_run($config->{flow_send}->{progname})
 
 # MAIN BODY
 run [$conntrack, format_args($config->{conntrack})],
-        \undef, init => conntrack_init($config),
-    '|', ct2ft($config),
-    '|', ptee($config),
+        \undef, init => sub { conntrack_init($config) },
+    '|', sub { ct2ft($config) },
+    '|', sub { ptee($config) },
     '|', [$flow_import, format_args($config->{flow_import})],
     '|', [$flow_send, format_args($config->{flow_send})];
 
