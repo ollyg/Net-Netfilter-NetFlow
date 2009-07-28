@@ -1,0 +1,5 @@
+libnet-netfilter-netflow-perl (0.01) UNRELEASED; urgency=low
+
+  * Initial release.
+
+ -- Oliver Gorwits <oliver.gorwits@oucs.ox.ac.uk>  Tue, 28 Jul 2009 12:55:21 +0100

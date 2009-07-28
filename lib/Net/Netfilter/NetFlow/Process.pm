@@ -145,7 +145,7 @@ Oliver Gorwits C<< <oliver.gorwits@oucs.ox.ac.uk> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (c) The University of Oxford 2008.
+Copyright (c) The University of Oxford 2009.
 
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
