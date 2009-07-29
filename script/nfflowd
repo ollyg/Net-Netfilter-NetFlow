@@ -301,9 +301,18 @@ dispatcher only:
      </conf>
  </ptee>
 
-In addition you can control how each of the helper applications are loaded and
-configured. You would generally not need to do this, but here are the config
-options anyway:
+C<nfflowd> records the start and end of each connection reported by netfilter.
+To preserve memory, the application clears up its records of "unfinished"
+connections which are older than a set TTL. This defaults to one week, but can
+be changed by setting a seconds value using the following configuration:
+
+ <ct2ft>
+     ttl  604800
+ </ct2ft>
+
+In addition, you can control how each of the helper applications are loaded
+and configured. You would generally not need to do this, but here are the
+config options anyway:
 
  <conntrack>
      progname    conntrack
@@ -408,6 +417,9 @@ __DATA__
     init_format -L
     format      -E -e NEW,DESTROY -o timestamp -n
 </conntrack>
+<ct2ft>
+    ttl 604800
+</ct2ft>
 <ptee>
     <conf>
         dispatchers screen

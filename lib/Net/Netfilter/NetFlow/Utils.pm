@@ -29,7 +29,7 @@ sub load_config {
 # interpolate the config vars
 sub format_args {
     my $stub = shift;
-    my $pre  = shift || ''; # maybe init
+    my $pre  = shift || ''; # maybe init_
     my $rv = sprintf $stub->{"${pre}format"},
         @{$stub->{"${pre}args"} || []};
     return split /\s+/, $rv;
