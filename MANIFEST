@@ -17,7 +17,6 @@ MANIFEST			This list of files
 META.yml
 README
 script/nfflowd
-share/nfflowd.conf
 t/10-load.t
 t/pod-coverage.t
 t/pod.t

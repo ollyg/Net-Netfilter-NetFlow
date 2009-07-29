@@ -24,9 +24,15 @@ newdaemon(
 sub gd_redirect_output {
     my $self = shift;
     return if $self->{gd_foreground};
+
     my $logname = $self->gd_logname;
-    my $p = $self->{gd_logpriority} ? "-p $self->{gd_logpriority}" : "";
-    open(STDERR, "|logger $p -t '$logname'") or (print "could not open stderr: $!" && exit(1));
+    my $priority = $self->{gd_logpriority}
+        ? "-p $self->{gd_logpriority}" : "";
+    my $logger = can_run('logger')
+        or die "Failed to find a local copy of logger in the path\n";
+
+    open(STDERR, "|$logger $priority -t '$logname'")
+        or die "Could not open stderr: $!\n";
 
     # don't mess with STDOUT because it upsets IPC::Run
     #close(STDOUT);
@@ -112,6 +118,276 @@ sub gd_run {
         '|', [$flow_send, format_args($config->{flow_send})];
 }
 
+=pod
+
+=head1 NAME
+
+Net::Netfilter::NetFlow - App to generate Cisco NetFlow from Linux netfilter
+
+=head1 PURPOSE
+
+If you run a Linux based firewall, the C<nfflowd> application in this
+distribution will generate a stream of Cisco NetFlow logging data for all TCP,
+UDP and ICMP connections passing through.
+
+What makes this different from other solutions is that it uses Linux netfilter's
+own connection tracking data, rather than observing a traffic capture. This is
+more efficient for your CPU, and allows tracking of NAT which would otherwise
+not be possible.
+
+No reconfiguration of the firewall ruleset or network is required.
+
+=head1 SYNOPSIS
+
+Make sure you have the C<conntrack> and C<flow-tools> packages installed on
+your Linux firewall system.
+
+ write a small configuration describing your NetFlow collector:
+ ~# cat > /etc/nfflowd.conf
+ <flow_send>
+     # source interface on this server
+     args 10.0.0.1
+     # netflow collector address
+     args 192.168.0.1
+     # netflow collector port number
+     args 65001
+ </flow_send>
+ ^D
+ 
+ to start the logger as a daemon:
+ ~# nfflowd start
+ 
+ to specify a custom configuration other than /etc/nfflowd.conf:
+ ~# nfflowd -c /other/config/file.ini
+
+=head1 LIMITATIONS
+
+=over 4
+
+=item *
+
+It's assumed that Source IP NAT is taking place. If not, you may receive
+additional unecessary log lines, sorry. Work is planned to change the
+conntrack parser to be configurable for different local modes of operation.
+
+=item *
+
+Currently only TCP, UDP and ICMP traffic is logged. Again this will likely be
+improved as part of the planned changes to the conntrack output parser.
+
+=item *
+
+The tool supports only IPv4 tracking. Is there a C<conntrack> for IPv6?
+
+=back
+
+=head1 DESCRIPTION
+
+The application C<nfflowd> included in this distribution is designed to run as
+a daemon (background) process on a Linux based firewall running IPtables.
+
+Its purpose is to capture data from the Linux netfilter subsystem about each
+tracked data connection passing through the firewall, and log this in Cisco
+NetFlow format to a remote NetFlow collector server. We recommend the Argus 3
+software for that collector (L<http://www.qosient.com/argus/>). With the
+default configuration you will also receive a local copy of the same data via
+C<syslog>, under the C<local6> facility.
+
+C<nfflowd> was written for NAT environments where you have a requirement to
+trace the IP address on the "private" side which made a particular connection
+or flow to a port/destination on the "public" (Internet) side. The NetFlow
+streams logged will allow you to trace back to that private IP.
+
+The daemon requires no reconfiguration of your firewall ruleset or network,
+but you may need to install one or two additional helper programs. These are
+commonly available in most Linux distributions - see L</DEPENDENCIES>, below.
+
+C<nfflowd> is also efficient and accurate, as it uses Linux netfilter's own
+connection logging and tracking data. This is preferable to observing a
+promiscuous traffic capture, which may be CPU intensive and certainly cannot
+track NAT connections.
+
+=head2 What's special about NAT?
+
+An issue that's specific to NAT (rather than general Netflow from a Linux
+router) is that you really need a good and accurate record of the IP and port
+number translation. So there are I<two> traffic flows, one before and one
+after the NAT. Both need logging, together with a way to correlate them.
+
+Traditionally such things are attempted using two instances of
+C<softflowd> or C<argus>, one each side of the NAT. With accurate timestamping
+the two flows (pre and post-NAT) can be correlated and then the IP and port
+translation deduced.
+
+However this doesn't work for very long running flows, or where there are
+numerous flows to a destination, some of which are legitimate and some not.
+There exist cases where it is impossible to be sure that you are correlating
+the correct two flow records. Seeing as netfilter is already accurately
+tracking every connection, with NAT information, we can make use of that data.
+
+=head1 USAGE
+
+The C<nfflowd> application included in this distribution is designed to run as
+a daemon (background) process. It also supports running in the foreground. You
+will need to provide a small amount of configuration, and otherwise there are
+sane defaults for all options.
+
+Here is the help text for the current version of C<nfflowd>:
+
+ Usage: nfflowd [ -c file ] [ -f ] { start | stop | restart | install | check | help | version } 
+  -c file     Specify configuration file (instead of /etc/nfflowd.conf)
+  -f          Run in the foreground (don't detach)
+  start       Starts a new nfflowd if there isn't one running already
+  stop        Stops a running nfflowd
+  restart     Stops a running nfflowd if one is running.  Starts a new one.
+  install     Setup nfflowd to run automatically after reboot
+  check       Check the configuration file and report the daemon state
+  help        Display this usage info
+  version     Display the version of nfflowd
+
+Although the C<reload> option is also available, it currently has no effect.
+Please note that the C<install> option has not been tested by the author.
+
+=head1 CONFIGURATION
+
+At minimum you need to provide a small configuration to let C<nfflowd> know
+where your NetFlow collector server is. This by default can be located at
+C</etc/nfflowd.conf> although you can specify an alternate location using the
+C<-c> command line option. The format of the file can be anything supported by
+L<Config::Any> (i.e. YAML, JSON, etc), although we recommend using
+L<Config::General> format, as in the examples below.
+
+The required configuration is the source IP on your firewall from which
+NetFlow packets are sent, and the IP/port numbers of the NetFlow collector
+server:
+
+ <flow_send>
+     # source interface on this server
+     args 10.0.0.1
+     # netflow collector address
+     args 192.168.0.1
+     # netflow collector port number
+     args 65001
+ </flow_send>
+
+These three options must appear I<in the exact order given above>.
+
+The other thing you might want to configure is whether and how a local copy of
+the NetFlow data is stored on the Linux firewall itself, via Syslog. The
+application uses L<Log::Dispatch> and by default will log to Syslog facility
+C<local6> with priority <info>.
+
+Below is the default configuration, which you can override in your local
+C<nfflowd> configuration file, but B<be warned!> You I<must> retain the
+C<screen> dispatcher and configuration section, otherwise the application will
+stop working. You have the option to remove, change, or add to the C<syslog>
+dispatcher only:
+
+ <ptee>
+     <conf>
+         dispatchers screen
+         dispatchers syslog
+         <screen>
+             stderr    0
+             class     Log::Dispatch::Screen
+             min_level debug
+         </screen>
+         <syslog>
+             class     Log::Dispatch::Syslog
+             ident     conntrack
+             min_level debug
+             facility  local6
+         </syslog>
+     </conf>
+ </ptee>
+
+In addition you can control how each of the helper applications are loaded and
+configured. You would generally not need to do this, but here are the config
+options anyway:
+
+ <conntrack>
+     progname    conntrack
+     init_format -L
+     format      -E -e NEW,DESTROY -o timestamp -n
+ </conntrack>
+ <flow_import>
+     progname flow-import
+     format   -z0 -f2 -V5 -m0xFF31EF
+ </flow_import>
+ <flow_send>
+     progname flow-send
+     format   -V5 -s %s/%s/%s
+ </flow_send>
+
+=head1 PAR Support
+
+Simple tests have shown it should be possible to package up this application
+with PAR, and ship to servers which do not have Perl and/or the Perl module
+dependencies installed.
+
+=head1 DEPENDENCIES
+
+Other than the standard contents of a Perl 5.8 distribution, you will need:
+
+=over 4
+
+=item Conntrack Tools <http://conntrack-tools.netfilter.org/>
+
+Probably called C<conntrack> in your Linux distribution.
+
+=item *
+
+flow-tools L<http://www.splintered.net/sw/flow-tools/>
+
+=item *
+
+L<Log::Dispatch::Configurator::Any> version 1.0005 or later
+
+=item *
+
+L<Daemon::Generic>
+
+=item *
+
+L<File::Slurp> version 9999.06 or later
+
+=item *
+
+L<IPC::Run>
+
+=item *
+
+L<Config::General>
+
+=item *
+
+L<Config::Any> version 0.15 or later
+
+=back
+
+=head1 SEE ALSO
+
+=over 4
+
+=item C<pfflowd> at L<http://www.mindrot.org/projects/pfflowd/>
+
+This is the BSD pf equivalent of this tool.
+
+=item C<softflowd> at L<http://www.mindrot.org/projects/softflowd/>
+
+From the C<pfflowd> stable, this tool requires a promiscuous traffic capture
+to generate data. It is therefore not fully stateful and cannot track NAT.
+
+=item http://www.cisco.com/en/US/tech/tk812/tsd_technology_support_protocol_home.html
+
+Cisco homepage for their NetFlow technology.
+
+=back
+
+=head1 THANKS
+
+David Ford of the University of Oxford's OxCERT team provided valuable input
+and testing infrastructure, many thanks.
 
 =head1 AUTHOR
 

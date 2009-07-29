@@ -16,8 +16,8 @@ requires    'Log::Dispatch::Configurator::Any' => '1.0005';
 requires    'Daemon::Generic' => 0;
 requires    'File::Slurp'     => '9999.06';
 requires    'IPC::Run'        => 0;
-
-recommends  'Config::General' => 0;
+requires    'Config::Any'     => '0.15';
+requires    'Config::General' => 0;
 
 test_requires  'Test::More' => 0;
 test_requires  'Test::Pod'  => 0;
