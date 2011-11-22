@@ -1,4 +1,7 @@
 package Net::Netfilter::NetFlow::Utils;
+{
+  $Net::Netfilter::NetFlow::Utils::VERSION = '1.113260';
+}
 
 use strict;
 use warnings FATAL => 'all';

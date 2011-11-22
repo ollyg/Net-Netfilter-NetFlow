@@ -1,4 +1,7 @@
 package Net::Netfilter::NetFlow::Process;
+{
+  $Net::Netfilter::NetFlow::Process::VERSION = '1.113260';
+}
 
 use strict;
 use warnings FATAL => 'all';

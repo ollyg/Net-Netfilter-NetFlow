@@ -1,4 +1,7 @@
 package Net::Netfilter::NetFlow::ConntrackFormat;
+{
+  $Net::Netfilter::NetFlow::ConntrackFormat::VERSION = '1.113260';
+}
 
 use strict;
 use warnings FATAL => 'all';
