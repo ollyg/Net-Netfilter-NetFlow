@@ -12,9 +12,6 @@ use Daemon::Generic;
 use File::Slurp 9999.06;
 use IPC::Run qw(run kill_kill);
 
-our $VERSION = '0.07';
-$VERSION = eval $VERSION; # numify for warning-free dev releases
-
 newdaemon(
     progname    => 'nfflowd',
     logpriority => 'daemon.info',
@@ -118,11 +115,11 @@ sub gd_run {
         '|', [$flow_send, format_args($config->{flow_send})];
 }
 
-=pod
 
-=head1 NAME
+# ABSTRACT: App to generate Cisco NetFlow from Linux netfilter
+# PODNAME: nfflowd
 
-Net::Netfilter::NetFlow - App to generate Cisco NetFlow from Linux netfilter
+=begin :prelude
 
 =head1 PURPOSE
 
@@ -136,6 +133,8 @@ more efficient for your CPU, and allows tracking of NAT which would otherwise
 not be possible.
 
 No reconfiguration of the firewall ruleset or network is required.
+
+=end :prelude
 
 =head1 SYNOPSIS
 
@@ -167,13 +166,11 @@ your Linux firewall system.
 =item *
 
 It's assumed that Source IP NAT is taking place. If not, you may receive
-additional unecessary log lines, sorry. Work is planned to change the
-conntrack parser to be configurable for different local modes of operation.
+additional unecessary log lines, sorry.
 
 =item *
 
-Currently only TCP, UDP and ICMP traffic is logged. Again this will likely be
-improved as part of the planned changes to the conntrack output parser.
+Currently only TCP, UDP and ICMP traffic is logged.
 
 =item *
 
@@ -382,12 +379,6 @@ config options anyway:
      format   -V5 -s %s/%s/%s
  </flow_send>
 
-=head1 PAR Support
-
-Simple tests have shown it should be possible to package up this application
-with PAR, and ship to servers which do not have Perl and/or the Perl module
-dependencies installed.
-
 =head1 DEPENDENCIES
 
 Other than the standard contents of a Perl 5.8 distribution, you will need:
@@ -451,17 +442,6 @@ Cisco homepage for their NetFlow technology.
 
 David Ford of the University of Oxford's OxCERT team provided valuable input
 and testing infrastructure, many thanks.
-
-=head1 AUTHOR
-
-Oliver Gorwits C<< <oliver.gorwits@oucs.ox.ac.uk> >>
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) The University of Oxford 2009.
-
-This library is free software; you can redistribute it and/or modify it under
-the same terms as Perl itself.
 
 =cut
 

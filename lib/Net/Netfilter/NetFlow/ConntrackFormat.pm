@@ -53,7 +53,7 @@ __END__
 
 =head1 AUTHOR
 
-Oliver Gorwits C<< <oliver.gorwits@oucs.ox.ac.uk> >>
+Oliver Gorwits C<< <oliver@cpan.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
